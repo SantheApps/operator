@@ -9,6 +9,7 @@ import { createDoctorCommand } from './commands/doctor.js';
 import { createConfigCommand } from './commands/config.js';
 import { createMemoryCommand } from './commands/memory.js';
 import { createGoalCommand, createApproveCommand } from './commands/goal.js';
+import { createReportCommand } from './commands/report.js';
 
 /**
  * Create the CLI program with all commands
@@ -19,7 +20,7 @@ export function createCLI(): Command {
     program
         .name('agent')
         .description('Agent Runtime — autonomous, goal-oriented AI agent with skills, plans, memory, and permissioned tools')
-        .version('0.4.0')
+        .version('0.5.0')
         .option('--verbose', 'Enable verbose output')
         .option('--no-color', 'Disable colored output')
         .option('--config <path>', 'Path to config file');
@@ -36,6 +37,7 @@ export function createCLI(): Command {
     program.addCommand(createMemoryCommand());
     program.addCommand(createGoalCommand());
     program.addCommand(createApproveCommand());
+    program.addCommand(createReportCommand());
 
     return program;
 }

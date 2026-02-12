@@ -152,6 +152,16 @@ export class MemoryStore {
             CREATE INDEX IF NOT EXISTS idx_tasks_goal ON tasks(goal_id);
             CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status);
             CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_events(entity_type, entity_id);
+
+            -- Skill Metrics table
+            CREATE TABLE IF NOT EXISTS skill_metrics (
+                skill TEXT PRIMARY KEY,
+                calls INTEGER DEFAULT 0,
+                successes INTEGER DEFAULT 0,
+                failures INTEGER DEFAULT 0,
+                total_duration_ms INTEGER DEFAULT 0,
+                last_used DATETIME
+            );
         `);
     }
 
@@ -319,6 +329,54 @@ export class MemoryStore {
         return this.db.prepare(
             'SELECT * FROM audit_events ORDER BY created_at DESC LIMIT ?'
         ).all(limit);
+    }
+
+    /**
+     * Get activity for a specific date (default: today)
+     */
+    getDailyActivity(date: Date = new Date()): any[] {
+        const startOfDay = new Date(date);
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const endOfDay = new Date(date);
+        endOfDay.setHours(23, 59, 59, 999);
+
+        return this.db.prepare(`
+            SELECT * FROM audit_events 
+            WHERE created_at BETWEEN ? AND ?
+            ORDER BY created_at ASC
+        `).all(startOfDay.toISOString(), endOfDay.toISOString());
+    }
+
+    // ─── Skill Metrics ───────────────────────────────────────
+
+    /**
+     * Record usage of a skill
+     */
+    recordSkillMetric(skill: string, success: boolean, durationMs: number): void {
+        const stmt = this.db.prepare(`
+            INSERT INTO skill_metrics (skill, calls, successes, failures, total_duration_ms, last_used)
+            VALUES (?, 1, ?, ?, ?, datetime('now'))
+            ON CONFLICT(skill) DO UPDATE SET
+                calls = calls + 1,
+                successes = successes + (excluded.successes),
+                failures = failures + (excluded.failures),
+                total_duration_ms = total_duration_ms + excluded.total_duration_ms,
+                last_used = datetime('now')
+        `);
+        stmt.run(
+            skill,
+            success ? 1 : 0,
+            success ? 0 : 1,
+            durationMs
+        );
+    }
+
+    /**
+     * Get metrics for all skills
+     */
+    getSkillMetrics(): any[] {
+        return this.db.prepare('SELECT * FROM skill_metrics ORDER BY calls DESC').all();
     }
 
     // ─── Cleanup ─────────────────────────────────────────────
