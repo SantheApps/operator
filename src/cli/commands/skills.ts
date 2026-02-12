@@ -3,6 +3,7 @@ import chalk from 'chalk';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { ConfigLoader } from '../../config/loader.js';
+import { MemoryStore } from '../../memory/store.js';
 import { SkillLoader } from '../../skills/loader.js';
 import { validateSkill } from '../../skills/validator.js';
 import { getSkillsDir } from '../../utils/paths.js';
@@ -472,6 +473,58 @@ export function createSkillsCommand(): Command {
                 console.error(chalk.red(`\n✗ Failed to fetch catalog: ${(err as Error).message}\n`));
                 process.exit(1);
             }
+        });
+
+    // ─── Stats ───
+    cmd
+        .command('stats')
+        .description('Show skill usage statistics')
+        .action(async () => {
+            const mem = MemoryStore.open(process.cwd());
+            const metrics = mem.getSkillMetrics();
+
+            if (metrics.length === 0) {
+                console.log(chalk.yellow('\nNo skill usage recorded yet.\n'));
+                return;
+            }
+
+            console.log(chalk.bold.cyan('\n📊 Skill Metrics\n'));
+
+            // Column widths
+            const nameW = 20;
+            const callsW = 8;
+            const successW = 10;
+            const failuresW = 10;
+            const rateW = 8;
+            const timeW = 10;
+
+            console.log(
+                chalk.dim(
+                    'SKILL'.padEnd(nameW) +
+                    'CALLS'.padEnd(callsW) +
+                    'SUCCESS'.padEnd(successW) +
+                    'FAILURES'.padEnd(failuresW) +
+                    'RATE'.padEnd(rateW) +
+                    'AVG TIME'.padEnd(timeW)
+                )
+            );
+            console.log(chalk.dim('-'.repeat(nameW + callsW + successW + failuresW + rateW + timeW)));
+
+            for (const m of metrics) {
+                const rate = Math.round((m.successes / m.calls) * 100);
+                const avgTime = Math.round(m.total_duration_ms / m.calls);
+                const rateColor = rate > 90 ? chalk.green : rate > 70 ? chalk.yellow : chalk.red;
+
+                console.log(
+                    chalk.white(m.skill.padEnd(nameW)) +
+                    m.calls.toString().padEnd(callsW) +
+                    chalk.green(m.successes.toString().padEnd(successW)) +
+                    chalk.red(m.failures.toString().padEnd(failuresW)) +
+                    rateColor((rate + '%').padEnd(rateW)) +
+                    (avgTime + 'ms').padEnd(timeW)
+                );
+            }
+            console.log();
         });
 
     return cmd;

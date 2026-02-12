@@ -64,6 +64,8 @@ export class TaskExecutor {
      * Execute task using an assigned skill
      */
     private async executeWithSkill(task: Task): Promise<{ success: boolean; output: string }> {
+        const start = Date.now();
+
         // Gather context
         const memoryContext = this.memoryStore.getContext(task.title, 200);
         const goal = this.goalStore.getGoal(task.goal_id);
@@ -92,38 +94,53 @@ Skill: ${task.skill}
 ${goal ? `Parent Goal: ${goal.title}` : ''}
 ${Object.keys(task.input).length > 0 ? `Input: ${JSON.stringify(task.input)}` : ''}`;
 
-        const response = await this.llm.chat({
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userPrompt },
-            ],
-            temperature: 0.2,
-            maxTokens: 1500,
-            skillName: task.skill ?? undefined,
-        });
+        let success = true;
+        let output = '';
 
-        // Extract and run any bash commands from the response
-        const commands = this.extractCommands(response.content);
-        const commandResults: string[] = [];
+        try {
+            const response = await this.llm.chat({
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt },
+                ],
+                temperature: 0.2,
+                maxTokens: 1500,
+                skillName: task.skill ?? undefined,
+            });
 
-        for (const cmd of commands) {
-            try {
-                const { stdout, stderr } = await execAsync(cmd, {
-                    cwd: this.workDir,
-                    timeout: 60_000,
-                    env: { ...process.env },
-                });
-                commandResults.push(`$ ${cmd}\n${stdout.trim()}${stderr ? '\nstderr: ' + stderr.trim() : ''}`);
-            } catch (err: any) {
-                commandResults.push(`$ ${cmd}\nFailed: ${err.message}`);
+            // Extract and run any bash commands from the response
+            const commands = this.extractCommands(response.content);
+            const commandResults: string[] = [];
+
+            for (const cmd of commands) {
+                try {
+                    const { stdout, stderr } = await execAsync(cmd, {
+                        cwd: this.workDir,
+                        timeout: 60_000,
+                        env: { ...process.env },
+                    });
+                    commandResults.push(`$ ${cmd}\n${stdout.trim()}${stderr ? '\nstderr: ' + stderr.trim() : ''}`);
+                } catch (err: any) {
+                    success = false;
+                    commandResults.push(`$ ${cmd}\nFailed: ${err.message}`);
+                }
             }
+
+            output = commands.length > 0
+                ? `${response.content}\n\n--- Executed Commands ---\n${commandResults.join('\n\n')}`
+                : response.content;
+
+        } catch (err) {
+            success = false;
+            output = `LLM/Execution Error: ${(err as Error).message}`;
         }
 
-        const output = commands.length > 0
-            ? `${response.content}\n\n--- Executed Commands ---\n${commandResults.join('\n\n')}`
-            : response.content;
+        // Record metrics
+        if (task.skill) {
+            this.memoryStore.recordSkillMetric(task.skill, success, Date.now() - start);
+        }
 
-        return { success: true, output };
+        return { success, output };
     }
 
     /**
