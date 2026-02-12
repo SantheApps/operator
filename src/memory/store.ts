@@ -190,7 +190,18 @@ export class MemoryStore {
             LIMIT ?
         `);
 
-        const results = stmt.all(query, limit) as any[];
+        // Sanitize query for FTS5: remove special chars that break syntax
+        // or wrap in quotes if you want exact match. 
+        // For now, let's just strip non-alphanumeric except spaces.
+        const safeQuery = query.replace(/[^\w\s]/g, ' ').trim();
+
+        // If query becomes empty after sanitization, return empty results
+        if (!safeQuery) return [];
+
+        // Use OR logic for multiple terms for broader context
+        const ftsQuery = safeQuery.split(/\s+/).join(' OR ');
+
+        const results = stmt.all(ftsQuery, limit) as any[];
 
         // Update accessed_at for returned memories
         const updateStmt = this.db.prepare(`

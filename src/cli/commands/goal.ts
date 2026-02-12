@@ -2,6 +2,10 @@ import { Command } from 'commander';
 import chalk from 'chalk';
 import { MemoryStore } from '../../memory/store.js';
 import { GoalStore } from '../../goals/store.js';
+import { GoalDecomposer } from '../../goals/decomposer.js';
+import { TaskExecutor } from '../../goals/executor.js';
+import { ConfigLoader } from '../../config/loader.js';
+import { LLMRouter } from '../../llm/router.js';
 
 function getStores() {
     const mem = MemoryStore.open(process.cwd());
@@ -258,6 +262,81 @@ export function createGoalCommand(): Command {
             const { goals } = getStores();
             goals.updateGoalStatus(parseInt(goalId), 'cancelled');
             console.log(chalk.red(`\n🚫 Goal #${goalId} cancelled\n`));
+        });
+
+    // ─── Decompose goal ───
+    cmd
+        .command('decompose <goalId>')
+        .description('Decompose a goal into tasks using AI')
+        .action(async (goalId: string) => {
+            const { mem, goals } = getStores();
+            const goal = goals.getGoal(parseInt(goalId));
+
+            if (!goal) {
+                console.error(chalk.red(`\n✗ Goal #${goalId} not found\n`));
+                return;
+            }
+
+            console.log(chalk.yellow(`\n🤖 Analyzing goal: "${goal.title}"...`));
+
+            try {
+                const configLoader = new ConfigLoader();
+                const config = await configLoader.load();
+                const llm = new LLMRouter(config);
+                const decomposer = new GoalDecomposer(llm, mem, goals);
+
+                const tasks = await decomposer.decomposeAndCreate(goal);
+
+                console.log(chalk.green(`\n✓ Goal decomposed into ${tasks.length} tasks:`));
+                for (const task of tasks) {
+                    const skillTag = task.skill ? chalk.blue(` [${task.skill}]`) : '';
+                    console.log(
+                        `  ${chalk.dim(`#${task.id}`)} ${chalk.white(task.title)}${skillTag}`
+                    );
+                }
+                console.log();
+            } catch (err) {
+                console.error(chalk.red(`\n✗ Decomposition failed: ${(err as Error).message}\n`));
+            }
+        });
+
+    // ─── Run tasks ───
+    cmd
+        .command('run')
+        .description('Execute pending tasks for active goals')
+        .option('-n, --max <n>', 'Max tasks to run', '5')
+        .action(async (opts: { max: string }) => {
+            const { mem, goals } = getStores();
+
+            try {
+                const configLoader = new ConfigLoader();
+                const config = await configLoader.load();
+                const llm = new LLMRouter(config);
+                const executor = new TaskExecutor(llm, mem, goals);
+
+                console.log(chalk.yellow('\n⚙️  Processing task queue...\n'));
+
+                const result = await executor.processQueue(parseInt(opts.max));
+
+                if (result.processed === 0) {
+                    console.log(chalk.dim('  No pending tasks found.\n'));
+                    return;
+                }
+
+                for (const res of result.results) {
+                    if (res.success) {
+                        console.log(chalk.green(`  ✓ Task #${res.taskId}: ${res.title}`));
+                        console.log(chalk.dim(`    → ${res.output.split('\n')[0]}`));
+                    } else {
+                        console.log(chalk.red(`  ✗ Task #${res.taskId}: ${res.title}`));
+                        console.log(chalk.dim(`    → ${res.output}`));
+                    }
+                }
+
+                console.log(chalk.dim(`\n  Processed: ${result.processed}, Completed: ${result.completed}, Failed: ${result.failed}\n`));
+            } catch (err) {
+                console.error(chalk.red(`\n✗ Execution failed: ${(err as Error).message}\n`));
+            }
         });
 
     return cmd;

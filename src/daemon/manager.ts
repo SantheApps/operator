@@ -1,4 +1,4 @@
-import { readFile, writeFile, access } from 'node:fs/promises';
+import { readFile, writeFile, access, unlink, mkdir } from 'node:fs/promises';
 import path from 'node:path';
 import { fork, type ChildProcess } from 'node:child_process';
 import { getAgentDir } from '../utils/paths.js';
@@ -8,13 +8,15 @@ import { getAgentDir } from '../utils/paths.js';
  */
 export class DaemonManager {
     private pidFile: string;
+    private logFile: string;
 
-    constructor(pidFile?: string) {
-        this.pidFile = pidFile ?? path.join(getAgentDir(), 'daemon.pid');
+    constructor() {
+        this.pidFile = path.join(getAgentDir(), 'daemon.pid');
+        this.logFile = path.join(getAgentDir(), 'daemon.log');
     }
 
     /**
-     * Start the daemon
+     * Start the daemon as a detached background process
      */
     async start(): Promise<{ pid: number; message: string }> {
         // Check if already running
@@ -23,15 +25,25 @@ export class DaemonManager {
             return { pid: existing.pid!, message: `Daemon already running (PID: ${existing.pid})` };
         }
 
-        // Fork the daemon process
+        // Ensure .agent dir exists
+        await mkdir(path.dirname(this.pidFile), { recursive: true });
+
+        // Resolve to the compiled service.js
         const daemonScript = path.resolve(
             path.dirname(new URL(import.meta.url).pathname),
-            'scheduler.js'
+            'service.js'
         );
 
+        // Fork the daemon process
         const child: ChildProcess = fork(daemonScript, [], {
             detached: true,
             stdio: 'ignore',
+            cwd: process.cwd(),
+            env: {
+                ...process.env,
+                AGENT_DAEMON: '1',
+                AGENT_WORK_DIR: process.cwd(),
+            },
         });
 
         child.unref();
@@ -43,7 +55,7 @@ export class DaemonManager {
     }
 
     /**
-     * Stop the daemon
+     * Stop the daemon gracefully
      */
     async stop(): Promise<{ message: string }> {
         const status = await this.status();
@@ -53,8 +65,6 @@ export class DaemonManager {
 
         try {
             process.kill(status.pid, 'SIGTERM');
-            // Clean up PID file
-            const { unlink } = await import('node:fs/promises');
             await unlink(this.pidFile).catch(() => { });
             return { message: `Daemon stopped (PID: ${status.pid})` };
         } catch (err) {
@@ -65,7 +75,11 @@ export class DaemonManager {
     /**
      * Get daemon status
      */
-    async status(): Promise<{ running: boolean; pid?: number }> {
+    async status(): Promise<{
+        running: boolean;
+        pid?: number;
+        uptime?: string;
+    }> {
         try {
             await access(this.pidFile);
             const pidStr = await readFile(this.pidFile, 'utf-8');
@@ -76,13 +90,25 @@ export class DaemonManager {
                 process.kill(pid, 0);
                 return { running: true, pid };
             } catch {
-                // PID file exists but process is dead
-                const { unlink } = await import('node:fs/promises');
+                // PID file exists but process is dead — clean up
                 await unlink(this.pidFile).catch(() => { });
                 return { running: false };
             }
         } catch {
             return { running: false };
+        }
+    }
+
+    /**
+     * Get recent daemon log lines
+     */
+    async getLogs(lines = 30): Promise<string[]> {
+        try {
+            const content = await readFile(this.logFile, 'utf-8');
+            const allLines = content.split('\n').filter(l => l.trim());
+            return allLines.slice(-lines);
+        } catch {
+            return ['No daemon logs found.'];
         }
     }
 }
