@@ -7,6 +7,8 @@ import { createDaemonCommand } from './commands/daemon.js';
 import { createMcpCommand } from './commands/mcp.js';
 import { createDoctorCommand } from './commands/doctor.js';
 import { createConfigCommand } from './commands/config.js';
+import { createMemoryCommand } from './commands/memory.js';
+import { createGoalCommand, createApproveCommand } from './commands/goal.js';
 
 /**
  * Create the CLI program with all commands
@@ -16,8 +18,8 @@ export function createCLI(): Command {
 
     program
         .name('agent')
-        .description('Agent Runtime — execute goals safely with skills, plans, and permissioned tools')
-        .version('0.1.0')
+        .description('Agent Runtime — autonomous, goal-oriented AI agent with skills, plans, memory, and permissioned tools')
+        .version('0.2.0')
         .option('--verbose', 'Enable verbose output')
         .option('--no-color', 'Disable colored output')
         .option('--config <path>', 'Path to config file');
@@ -31,6 +33,10 @@ export function createCLI(): Command {
     program.addCommand(createMcpCommand());
     program.addCommand(createDoctorCommand());
     program.addCommand(createConfigCommand());
+    program.addCommand(createMemoryCommand());
+    program.addCommand(createGoalCommand());
+    program.addCommand(createApproveCommand());
 
     return program;
 }
+
