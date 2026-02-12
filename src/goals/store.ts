@@ -293,6 +293,21 @@ export class GoalStore {
     }
 
     /**
+     * Get recent errors for a specific skill
+     */
+    getSkillErrors(skillName: string, limit = 5): string[] {
+        const stmt = this.db.prepare(`
+            SELECT error, output FROM tasks 
+            WHERE skill = ? AND (status IN ('failed', 'blocked') OR error IS NOT NULL)
+            ORDER BY created_at DESC 
+            LIMIT ?
+        `);
+
+        const rows = stmt.all(skillName, limit) as any[];
+        return rows.map(r => r.error || r.output || 'Unknown error');
+    }
+
+    /**
      * Get tasks waiting for approval
      */
     getPendingApprovals(): Task[] {

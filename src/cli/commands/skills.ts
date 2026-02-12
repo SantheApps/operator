@@ -527,5 +527,74 @@ export function createSkillsCommand(): Command {
             console.log();
         });
 
+
+    // ─── Doctor ───
+    cmd
+        .command('doctor <name>')
+        .description('Diagnose issues with a specific skill')
+        .action(async (name: string) => {
+            const configLoader = new ConfigLoader();
+            const config = await configLoader.load();
+            const skillLoader = new SkillLoader(config);
+            await skillLoader.loadAll();
+            const { LLMRouter } = await import('../../llm/router.js');
+            const llm = new LLMRouter(config);
+            const mem = MemoryStore.open(process.cwd());
+            const { SkillDoctor } = await import('../../skills/doctor.js');
+
+            const doctor = new SkillDoctor(mem, skillLoader, llm);
+            console.log(chalk.dim(`\n🔍 Analyzing logs for "${name}"...\n`));
+
+            const diagnosis = await doctor.diagnose(name);
+
+            console.log(chalk.bold.cyan(`🩺 Diagnosis for "${name}"\n`));
+
+            if (diagnosis.healthy) {
+                console.log(chalk.green('✓ Skill appears healthy.'));
+                if (diagnosis.logsanalyzed === 0) {
+                    console.log(chalk.dim('  (No recent usage or errors found)'));
+                }
+            } else {
+                console.log(chalk.red('✗ Issues detected:'));
+                for (const issue of diagnosis.issues) {
+                    console.log(chalk.yellow(`  - ${issue}`));
+                }
+                console.log(chalk.dim(`\n  Analyzed ${diagnosis.logsanalyzed} recent error logs.`));
+                console.log(chalk.dim(`  Run 'agent skills fix ${name}' to attempt auto-repair.`));
+            }
+            console.log();
+        });
+
+    // ─── Fix ───
+    cmd
+        .command('fix <name>')
+        .description('Attempt to auto-fix a broken skill using LLM')
+        .action(async (name: string) => {
+            const configLoader = new ConfigLoader();
+            const config = await configLoader.load();
+            const skillLoader = new SkillLoader(config);
+            await skillLoader.loadAll();
+
+            const { LLMRouter } = await import('../../llm/router.js');
+            const llm = new LLMRouter(config);
+            const mem = MemoryStore.open(process.cwd());
+            const { SkillDoctor } = await import('../../skills/doctor.js');
+
+            console.log(chalk.blue(`\n🔧 Attempting to fix "${name}" using LLM...`));
+            console.log(chalk.dim(`  Reading source code and error logs...`));
+
+            const doctor = new SkillDoctor(mem, skillLoader, llm);
+            const result = await doctor.fix(name);
+
+            if (result.success) {
+                console.log(chalk.green(`\n✓ Successfully patched "${name}"!`));
+                console.log(chalk.white(`  Reasoning: ${result.reasoning}`));
+                console.log(chalk.dim(`  The skill has been reloaded and is ready to use.\n`));
+            } else {
+                console.log(chalk.red(`\n✗ Failed to fix "${name}"`));
+                console.log(chalk.yellow(`  Reason: ${result.reasoning}\n`));
+            }
+        });
+
     return cmd;
 }

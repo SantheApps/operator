@@ -23,7 +23,7 @@ export class ReportGenerator {
         const tasksFailed = activity.filter(a => a.event_type === 'task.failed');
         const goalsCreated = activity.filter(a => a.event_type === 'goal.created');
         const memoriesSaved = activity.filter(a => a.event_type === 'memory.save');
-        const triggerFires = activity.filter(a => a.event_type === 'trigger.fired'); // Assuming I log this later
+
 
         const dateStr = date.toISOString().split('T')[0];
 

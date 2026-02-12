@@ -146,6 +146,20 @@ export class SkillLoader {
     }
 
     /**
+     * Reload a specific skill from disk
+     */
+    async reload(name: string): Promise<LoadedSkill | null> {
+        const skill = this.skills.get(name);
+        if (!skill) return null;
+
+        const reloaded = await this.loadSkill(skill.path);
+        if (reloaded) {
+            this.skills.set(name, reloaded);
+        }
+        return reloaded;
+    }
+
+    /**
      * Remove a skill
      */
     async remove(name: string): Promise<boolean> {
