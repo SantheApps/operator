@@ -23,7 +23,7 @@ export function createCLI(): Command {
     program
         .name('agent')
         .description('Agent Runtime — autonomous, goal-oriented AI agent with skills, plans, memory, and permissioned tools')
-        .version('0.8.0')
+        .version('0.8.2')
         .option('--verbose', 'Enable verbose output')
         .option('--no-color', 'Disable colored output')
         .option('--config <path>', 'Path to config file');
