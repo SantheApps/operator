@@ -40,10 +40,44 @@ Here is our vision for the next major milestones.
 - [x] **Tab Completion**: Autocomplete slash commands and user commands in the REPL.
 - [x] **Conversation Context**: Multi-turn session with conversation compaction support.
 
+## Phase 7: Desktop Automation (All OS)
+Cross-platform desktop control so the agent can operate any application — not just the terminal.
+
+### Layer 1: Screen Control (`desktop.*` tools)
+- [ ] **`desktop.screenshot`**: Capture the screen or a specific window, return as base64 for vision LLMs.
+- [ ] **`desktop.click`** / **`desktop.doubleClick`** / **`desktop.rightClick`**: Mouse control at pixel coordinates.
+- [ ] **`desktop.type`** / **`desktop.hotkey`**: Keyboard input and shortcut combinations (e.g., `Ctrl+S`).
+- [ ] **`desktop.scroll`**: Scroll at position or within active window.
+- [ ] **`desktop.drag`**: Drag from point A to point B.
+- [ ] **Cross-platform engine**: Built on [`nut.js`](https://nutjs.dev) — works on Windows, macOS, and Linux with a single API.
+
+### Layer 2: AI-Powered Vision
+- [ ] **Anthropic Computer Use**: Send screenshots to Claude, receive structured actions (`click`, `type`, `scroll`) with coordinates.
+- [ ] **Vision Loop**: `screenshot → LLM analysis → action → screenshot → verify` cycle for goal-driven desktop automation.
+- [ ] **Element Detection**: Use image template matching (`@nut-tree/template-matcher`) to find UI elements by visual appearance.
+- [ ] **OCR Integration**: Extract text from screen regions for reading non-accessible UI content.
+
+### Layer 3: OS-Native Accessibility APIs
+- [ ] **macOS**: AppleScript / JXA for native app control (`tell application "Safari" to open location`).
+- [ ] **Windows**: PowerShell + UI Automation API for Win32/WPF/UWP app control.
+- [ ] **Linux**: `xdotool` + AT-SPI2 for X11/Wayland window management and GTK/Qt app inspection.
+- [ ] **Window Management**: `desktop.focus`, `desktop.resize`, `desktop.list_windows` via `active-win` / `node-window-manager`.
+
+### Layer 4: Browser Automation
+- [ ] **Playwright Integration**: `desktop.browser.open`, `desktop.browser.click`, `desktop.browser.fill` for web app automation.
+- [ ] **Cookie/Session Persistence**: Maintain browser sessions across agent runs.
+
+### Use Cases
+- *"Open Figma, export the homepage design as PNG, then create a Next.js component from it"*
+- *"Fill out this expense report in the company portal"*
+- *"Take a screenshot of the staging site and compare it to the design mockup"*
+- *"Open Slack and send the deployment status to #engineering"*
+
 ## 🤝 Join the Mission
 This is an open-source journey. We need help with:
 - Writing new Skills (see `docs/articles/03-skill-execution.md`)
 - Improving the Planner prompt engineering
 - Building the Web Dashboard
+- Building Desktop Automation plugins
 
 Submit a PR and let's build the future of work, together.

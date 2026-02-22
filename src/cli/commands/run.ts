@@ -39,6 +39,14 @@ export function createRunCommand(): Command {
             await skillLoader.loadAll();
             await commandLoader.loadProjectCommands(process.cwd());
 
+            const { PluginLoader } = await import('../../plugins/loader.js');
+            const { HookRegistry } = await import('../../hooks/registry.js');
+            const pluginLoader = new PluginLoader();
+            const hookRegistry = new HookRegistry();
+
+            const installPaths = config.plugins?.installPaths ?? ['.agent/plugins'];
+            await pluginLoader.loadAll(installPaths, process.cwd(), skillLoader, commandLoader, hookRegistry);
+
             const ctx: ExecutionContext = {
                 runId: generateRunId(),
                 cwd: process.cwd(),

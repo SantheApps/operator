@@ -105,7 +105,10 @@ export class PluginLoader {
                         for (const entry of entries) {
                             if (!entry.isDirectory()) continue;
                             const skill = await skillLoader.loadSkill(path.join(absSkillDir, entry.name));
-                            if (skill) skillsCount++;
+                            if (skill) {
+                                (skillLoader as any).skills.set(skill.manifest.name, skill);
+                                skillsCount++;
+                            }
                         }
                     } catch {
                         // Skill directory doesn't exist or can't be read

@@ -37,6 +37,67 @@ export function createInitCommand(): Command {
         .action(async () => {
             console.log(chalk.bold.cyan('\n▶ Initializing Agent Runtime\n'));
 
+            // Onboarding Prompts
+            const { default: inquirer } = await import('inquirer');
+            const answers = await inquirer.prompt([
+                {
+                    type: 'list',
+                    name: 'modelProvider',
+                    message: 'Select your preferred LLM provider:',
+                    choices: ['openai', 'anthropic', 'azure', 'ollama'],
+                    default: 'openai'
+                },
+                {
+                    type: 'input',
+                    name: 'modelName',
+                    message: 'Enter the model name (e.g., gpt-4o, claude-3-5-sonnet-20241022, llama3.2):',
+                    default: (ans: any) => {
+                        if (ans.modelProvider === 'openai') return 'gpt-4o';
+                        if (ans.modelProvider === 'anthropic') return 'claude-3-5-sonnet-20241022';
+                        if (ans.modelProvider === 'azure') return 'gpt-4o';
+                        if (ans.modelProvider === 'ollama') return 'llama3.2';
+                        return '';
+                    }
+                },
+                {
+                    type: 'password',
+                    name: 'apiKey',
+                    message: 'Enter your API Key (leave empty to use Environment Variables or Ollama):',
+                    mask: '*'
+                },
+                {
+                    type: 'list',
+                    name: 'policyApproval',
+                    message: 'Select the default policy approval level:',
+                    choices: [
+                        { name: 'Confirm (Ask before running tools)', value: 'confirm' },
+                        { name: 'Allow (Autonomous run)', value: 'allow' },
+                        { name: 'Deny (Strict mode)', value: 'deny' }
+                    ],
+                    default: 'confirm'
+                },
+                {
+                    type: 'checkbox',
+                    name: 'tools',
+                    message: 'Select the core tools to enable by default:',
+                    choices: [
+                        { name: 'Filesystem (fs.*)', value: 'fs.*', checked: true },
+                        { name: 'Execute Commands (cmd.run)', value: 'cmd.run', checked: true },
+                        { name: 'Git (git.*)', value: 'git.*', checked: true },
+                        { name: 'Project Info (project.*)', value: 'project.*', checked: true },
+                        { name: 'CLI Tools (cli.*) [AI wrappers]', value: 'cli.*', checked: true },
+                    ]
+                },
+                {
+                    type: 'confirm',
+                    name: 'updateGitignore',
+                    message: 'Add .agent/ and agent.config.json to your project root .gitignore?',
+                    default: true
+                }
+            ]);
+
+            console.log(chalk.cyan('\n⚙️  Applying configuration...\n'));
+
             const agentDir = getAgentDir();
             const dirs = [
                 agentDir,
@@ -54,8 +115,23 @@ export function createInitCommand(): Command {
             }
 
             // Create config file
+            const config = JSON.parse(JSON.stringify(DEFAULT_CONFIG));
+            config.models.routing.defaultProvider = answers.modelProvider;
+
+            if (!config.models.providers[answers.modelProvider]) {
+                config.models.providers[answers.modelProvider] = { type: answers.modelProvider };
+            }
+            config.models.providers[answers.modelProvider].model = answers.modelName;
+
+            if (answers.apiKey) {
+                config.models.providers[answers.modelProvider].apiKey = answers.apiKey;
+            }
+
+            config.policy.defaultApproval = answers.policyApproval;
+            config.tools.enabled = answers.tools;
+
             const configPath = getConfigPath();
-            await writeFile(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2) + '\n', 'utf-8');
+            await writeFile(configPath, JSON.stringify(config, null, 2) + '\n', 'utf-8');
             console.log(chalk.green('  ✓ Created ') + chalk.dim('agent.config.json'));
 
             // Create example plan
@@ -124,7 +200,7 @@ trigger:
             );
             console.log(chalk.green('  ✓ Created ') + chalk.dim('.agent/skills/hello-world/'));
 
-            // Create .gitignore for .agent
+            // Create local .gitignore for .agent
             await writeFile(
                 path.join(agentDir, '.gitignore'),
                 'runs/\nlogs/\ndaemon.pid\n.secrets\n',
@@ -132,11 +208,37 @@ trigger:
             );
             console.log(chalk.green('  ✓ Created ') + chalk.dim('.agent/.gitignore'));
 
+            // Update root .gitignore
+            if (answers.updateGitignore) {
+                const rootGitignore = path.join(process.cwd(), '.gitignore');
+                try {
+                    const fs = await import('node:fs/promises');
+                    let gitignoreStr = '';
+                    try {
+                        gitignoreStr = await fs.readFile(rootGitignore, 'utf-8');
+                    } catch { /* ignore if not exists */ }
+
+                    const entriesToAdd = [];
+                    // Check if already exactly present (crude check to prevent duplicates)
+                    if (!gitignoreStr.includes('.agent/')) entriesToAdd.push('.agent/');
+                    if (!gitignoreStr.includes('agent.config.json')) entriesToAdd.push('agent.config.json');
+
+                    if (entriesToAdd.length > 0) {
+                        const appendStr = (gitignoreStr && !gitignoreStr.endsWith('\n') ? '\n' : '') + '\n# Agent Runtime\n' + entriesToAdd.join('\n') + '\n';
+                        await fs.appendFile(rootGitignore, appendStr, 'utf-8');
+                        console.log(chalk.green('  ✓ Updated ') + chalk.dim('.gitignore ') + chalk.dim('(root)'));
+                    } else {
+                        console.log(chalk.green('  ✓ Root ') + chalk.dim('.gitignore ') + chalk.dim('already up to date'));
+                    }
+                } catch (e) {
+                    console.error(chalk.red('  ✗ Failed to update root .gitignore'), e);
+                }
+            }
+
             console.log(chalk.bold.green('\n✓ Agent Runtime initialized!\n'));
             console.log(chalk.dim('  Next steps:'));
-            console.log(chalk.dim('    1. Configure model providers in agent.config.json'));
-            console.log(chalk.dim('    2. Run: agent plan run example'));
-            console.log(chalk.dim('    3. Create skills: agent skills create <name>'));
+            console.log(chalk.dim('    1. Run: agent plan run example'));
+            console.log(chalk.dim('    2. Create skills: agent skills create <name>'));
             console.log();
         });
 
