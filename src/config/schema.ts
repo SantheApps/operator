@@ -47,6 +47,32 @@ const ToolConfigSchema = z.object({
     }).default({}),
 });
 
+// ─── Hook Config ───
+const HookConfigSchema = z.object({
+    enabled: z.boolean().default(true),
+    hooksPath: z.string().default('.agent/hooks'),
+    timeout: z.number().default(10000),
+});
+
+// ─── CLI Tools Config ───
+const CLIToolEntrySchema = z.object({
+    binary: z.string(),
+    available: z.boolean().default(false),
+});
+
+const CLIToolsConfigSchema = z.object({
+    cursor: CLIToolEntrySchema.default({ binary: 'cursor', available: false }),
+    codex: CLIToolEntrySchema.default({ binary: 'codex', available: false }),
+    gemini: CLIToolEntrySchema.default({ binary: 'gemini', available: false }),
+    claude: CLIToolEntrySchema.default({ binary: 'claude', available: false }),
+});
+
+// ─── Plugins Config ───
+const PluginsConfigSchema = z.object({
+    installPaths: z.array(z.string()).default(['.agent/plugins']),
+    autoLoad: z.boolean().default(true),
+});
+
 // ─── Skill Config ───
 const SkillConfigSchema = z.object({
     installPaths: z.array(z.string()).default(['.agent/skills']),
@@ -100,6 +126,9 @@ export const AgentConfigSchema = z.object({
     }).default({}),
     policy: PolicyConfigSchema.default({}),
     tools: ToolConfigSchema.default({}),
+    hooks: HookConfigSchema.default({}),
+    plugins: PluginsConfigSchema.default({}),
+    cliTools: CLIToolsConfigSchema.default({}),
     skills: SkillConfigSchema.default({}),
     daemon: DaemonConfigSchema.default({}),
     mcp: McpConfigSchema.default({}),

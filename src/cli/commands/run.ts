@@ -6,6 +6,7 @@ import { PolicyEngine } from '../../policy/engine.js';
 import { SkillLoader } from '../../skills/loader.js';
 import { SkillRunner } from '../../skills/runner.js';
 import { LLMRouter } from '../../llm/router.js';
+import { CommandLoader } from '../../commands/loader.js';
 import { registerCoreTools } from './init.js';
 import { promptApproval } from '../ui/prompt.js';
 import { progress } from '../ui/progress.js';
@@ -32,9 +33,11 @@ export function createRunCommand(): Command {
             const skillLoader = new SkillLoader(config);
             const llmRouter = new LLMRouter(config);
             const skillRunner = new SkillRunner(registry, policy, llmRouter);
+            const commandLoader = new CommandLoader();
 
 
             await skillLoader.loadAll();
+            await commandLoader.loadProjectCommands(process.cwd());
 
             const ctx: ExecutionContext = {
                 runId: generateRunId(),
@@ -72,6 +75,83 @@ export function createRunCommand(): Command {
                     }
                 } else {
                     progress.error(`Skill failed: ${result.error}`);
+                    process.exit(1);
+                }
+            } else if (commandLoader.has(goal) || commandLoader.has(goal.replace(/^\//, ''))) {
+                // ─── Run a Command (lightweight goal template) ───
+                const cmdName = goal.replace(/^\//, '');
+                const command = commandLoader.get(cmdName)!;
+
+                progress.start(`Running command: ${command.name}`, 1);
+                progress.step(command.description);
+
+                try {
+                    // Scope tools to what the command allows
+                    const allTools = registry.list();
+                    const allowedTools = command.tools.length > 0
+                        ? allTools.filter((t) => command.tools.some((pattern) => {
+                            if (pattern === t.name) return true;
+                            if (pattern.endsWith('.*')) return t.name.startsWith(pattern.slice(0, -1));
+                            return false;
+                        }))
+                        : allTools;
+
+                    const toolDefs = allowedTools.map((t) => {
+                        const fullTool = registry.get(t.name);
+                        return {
+                            name: t.name,
+                            description: t.description,
+                            inputSchema: fullTool ? zodToJsonSchema(fullTool.inputSchema) : {},
+                        };
+                    });
+
+                    const messages: LLMMessage[] = [
+                        { role: 'system', content: command.prompt },
+                        { role: 'user', content: `Execute this command. Additional context: ${goal}` },
+                    ];
+
+                    const maxIterations = 20;
+                    let finalOutput = '';
+
+                    for (let i = 0; i < maxIterations; i++) {
+                        const response = await llmRouter.chat({ messages, tools: toolDefs });
+
+                        if (response.toolCalls && response.toolCalls.length > 0) {
+                            messages.push({
+                                role: 'assistant',
+                                content: response.content || '',
+                                toolCalls: response.toolCalls,
+                            });
+
+                            for (const tc of response.toolCalls) {
+                                const tool = registry.get(tc.name);
+                                if (!tool) {
+                                    messages.push({ role: 'tool', content: JSON.stringify({ error: `Tool ${tc.name} not found` }), toolCallId: tc.id });
+                                    continue;
+                                }
+
+                                progress.info(`⚡ ${tc.name}(${JSON.stringify(tc.args).substring(0, 80)})`);
+                                const result = await registry.execute(tc.name, tc.args, ctx);
+
+                                if (result.success) {
+                                    progress.info(`  ✓ ${tc.name} succeeded`);
+                                } else {
+                                    progress.warning(`  ✗ ${tc.name}: ${result.error}`);
+                                }
+
+                                messages.push({ role: 'tool', content: JSON.stringify(result.data ?? { error: result.error }), toolCallId: tc.id });
+                            }
+                        } else {
+                            finalOutput = response.content;
+                            break;
+                        }
+                    }
+
+                    progress.success('Command completed');
+                    console.log(chalk.dim('\nResult:'));
+                    console.log(finalOutput);
+                } catch (err) {
+                    progress.error(`Failed: ${(err as Error).message}`);
                     process.exit(1);
                 }
             } else {

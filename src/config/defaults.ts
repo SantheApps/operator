@@ -56,6 +56,21 @@ export const DEFAULT_CONFIG: AgentConfig = {
             maxMemoryMb: 512,
         },
     },
+    hooks: {
+        enabled: true,
+        hooksPath: '.agent/hooks',
+        timeout: 10000,
+    },
+    plugins: {
+        installPaths: ['.agent/plugins'],
+        autoLoad: true,
+    },
+    cliTools: {
+        cursor: { binary: 'cursor', available: false },
+        codex: { binary: 'codex', available: false },
+        gemini: { binary: 'gemini', available: false },
+        claude: { binary: 'claude', available: false },
+    },
     skills: {
         installPaths: ['.agent/skills'],
         registryUrl: 'https://raw.githubusercontent.com/praveencs87/agent-skills/main',

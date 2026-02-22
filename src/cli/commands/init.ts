@@ -9,6 +9,7 @@ import { fsTools } from '../../tools/core/fs.js';
 import { cmdTools } from '../../tools/core/cmd.js';
 import { gitTools } from '../../tools/core/git.js';
 import { projectTools } from '../../tools/core/project.js';
+import { cliTools } from '../../tools/core/cli-tools.js';
 import type { ToolDefinition } from '../../tools/types.js';
 
 /**
@@ -20,6 +21,7 @@ export function registerCoreTools(registry: ToolRegistry): void {
         ...cmdTools as ToolDefinition[],
         ...gitTools as ToolDefinition[],
         ...projectTools as ToolDefinition[],
+        ...cliTools as ToolDefinition[],
     ];
 
     for (const tool of allTools) {

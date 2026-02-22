@@ -6,6 +6,7 @@ import { PolicyEngine } from '../policy/engine.js';
 import { SkillLoader } from '../skills/loader.js';
 import { SkillRunner } from '../skills/runner.js';
 import { RollbackTracker } from './rollback.js';
+import type { HookRegistry } from '../hooks/registry.js';
 import { auditEmitter, AuditEventType } from '../policy/audit.js';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -30,18 +31,21 @@ export class ExecutionEngine {
     private skillLoader: SkillLoader;
     private skillRunner: SkillRunner;
     private rollback: RollbackTracker;
+    private hooks?: HookRegistry;
 
     constructor(
         registry: ToolRegistry,
         policy: PolicyEngine,
         skillLoader: SkillLoader,
-        skillRunner: SkillRunner
+        skillRunner: SkillRunner,
+        hooks?: HookRegistry
     ) {
         this.registry = registry;
         this.policy = policy;
         this.skillLoader = skillLoader;
         this.skillRunner = skillRunner;
         this.rollback = new RollbackTracker();
+        this.hooks = hooks;
     }
 
     /**
@@ -152,7 +156,30 @@ export class ExecutionEngine {
             );
         }
 
+        // Hook: before:tool
+        if (this.hooks) {
+            await this.hooks.dispatch({
+                event: 'before:tool',
+                name: step.tool!,
+                args: step.args,
+                cwd: ctx.cwd,
+                runId: ctx.runId,
+            });
+        }
+
         const result = await this.registry.execute(step.tool!, step.args, ctx);
+
+        // Hook: after:tool
+        if (this.hooks) {
+            await this.hooks.dispatch({
+                event: 'after:tool',
+                name: step.tool!,
+                args: step.args,
+                result: { success: result.success, output: result.data, error: result.error },
+                cwd: ctx.cwd,
+                runId: ctx.runId,
+            });
+        }
 
         auditEmitter.emit(AuditEventType.TOOL_CALL, {
             stepId: step.id,

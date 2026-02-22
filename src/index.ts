@@ -10,6 +10,9 @@ export { ExecutionEngine } from './engine/executor.js';
 export { LLMRouter } from './llm/router.js';
 export { AuditLogger } from './logging/audit-log.js';
 export { ConfigLoader } from './config/loader.js';
+export { HookRegistry } from './hooks/registry.js';
+export { CommandLoader } from './commands/loader.js';
+export { PluginLoader } from './plugins/loader.js';
 
 // Types
 export type { ToolDefinition, ToolResult } from './tools/types.js';
@@ -17,3 +20,6 @@ export type { SkillManifest } from './skills/types.js';
 export type { Plan, PlanStep, Goal } from './plans/types.js';
 export type { AgentConfig } from './config/schema.js';
 export type { ExecutionContext, StepResult } from './engine/types.js';
+export type { HookEvent, HookDefinition, HookContext } from './hooks/types.js';
+export type { CommandDefinition } from './commands/types.js';
+export type { PluginManifest, LoadedPlugin } from './plugins/types.js';

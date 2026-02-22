@@ -4,15 +4,18 @@ import { ExecutionEngine } from '../engine/executor.js';
 import { AuditLogger } from '../logging/audit-log.js';
 import { auditEmitter, AuditEventType } from '../policy/audit.js';
 import { generateRunId } from '../utils/paths.js';
+import type { HookRegistry } from '../hooks/registry.js';
 
 /**
  * Plan runner — executes plan steps sequentially
  */
 export class PlanRunner {
     private engine: ExecutionEngine;
+    private hooks?: HookRegistry;
 
-    constructor(engine: ExecutionEngine) {
+    constructor(engine: ExecutionEngine, hooks?: HookRegistry) {
         this.engine = engine;
+        this.hooks = hooks;
     }
 
     /**
@@ -42,6 +45,16 @@ export class PlanRunner {
         });
 
         ctx.onProgress?.(`Starting plan: ${plan.name} (${plan.steps.length} steps)`);
+
+        // Hook: before:plan
+        if (this.hooks) {
+            await this.hooks.dispatch({
+                event: 'before:plan',
+                name: plan.name,
+                cwd: ctx.cwd,
+                runId,
+            });
+        }
 
         try {
             for (const step of plan.steps) {
@@ -112,6 +125,18 @@ export class PlanRunner {
                     { stepId: step.id, status: stepRun.status, error: stepRun.error }
                 );
 
+                // Hook: after:step
+                if (this.hooks) {
+                    await this.hooks.dispatch({
+                        event: 'after:step',
+                        name: step.id,
+                        args: step.args,
+                        result: { success: stepRun.status === 'completed', output: stepRun.output, error: stepRun.error },
+                        cwd: ctx.cwd,
+                        runId,
+                    });
+                }
+
                 // Handle failures
                 if (stepRun.status === 'failed') {
                     const action = step.onFailure ?? 'abort';
@@ -159,6 +184,17 @@ export class PlanRunner {
         });
 
         await auditLogger.complete(planRun.status === 'completed' ? 'completed' : 'failed');
+
+        // Hook: after:plan
+        if (this.hooks) {
+            await this.hooks.dispatch({
+                event: 'after:plan',
+                name: plan.name,
+                result: { success: planRun.status === 'completed' },
+                cwd: ctx.cwd,
+                runId,
+            });
+        }
 
         return planRun;
     }
