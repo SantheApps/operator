@@ -60,6 +60,19 @@ export function createInitCommand(): Command {
                     }
                 },
                 {
+                    type: 'input',
+                    name: 'azureEndpoint',
+                    message: 'Enter your Azure OpenAI Endpoint (e.g., https://your-resource.openai.azure.com):',
+                    when: (ans: any) => ans.modelProvider === 'azure',
+                },
+                {
+                    type: 'input',
+                    name: 'azureApiVersion',
+                    message: 'Enter your Azure API Version:',
+                    default: '2024-02-15-preview',
+                    when: (ans: any) => ans.modelProvider === 'azure',
+                },
+                {
                     type: 'password',
                     name: 'apiKey',
                     message: 'Enter your API Key (leave empty to use Environment Variables or Ollama):',
@@ -125,6 +138,12 @@ export function createInitCommand(): Command {
 
             if (answers.apiKey) {
                 config.models.providers[answers.modelProvider].apiKey = answers.apiKey;
+            }
+            if (answers.modelProvider === 'azure') {
+                if (answers.azureEndpoint) config.models.providers.azure.baseUrl = answers.azureEndpoint;
+                if (answers.azureApiVersion) config.models.providers.azure.apiVersion = answers.azureApiVersion;
+                // For Azure, model acts as deploymentName in our schema by default unless overridden
+                config.models.providers.azure.deploymentName = answers.modelName;
             }
 
             config.policy.defaultApproval = answers.policyApproval;

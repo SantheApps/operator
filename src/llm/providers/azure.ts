@@ -17,10 +17,13 @@ export class AzureOpenAIProvider implements LLMProvider {
         const openaiModule = await import('openai');
         const AzureOpenAI = openaiModule.AzureOpenAI;
 
-        const apiKey = this.config.apiKey ?? process.env['AZURE_API_KEY'];
-        const endpoint = this.config.baseUrl ?? process.env['AZURE_API_BASE'] ?? '';
-        const apiVersion = this.config.apiVersion ?? process.env['AZURE_API_VERSION'] ?? '2024-02-15-preview';
-        const deploymentName = this.config.deploymentName ?? process.env['AZURE_DEPLOYMENT_NAME'] ?? this.config.model;
+        const apiKey = this.config.apiKey || process.env['AZURE_API_KEY'] || process.env['AZURE_OPENAI_API_KEY'];
+        // Remove trailing slashes from endpoint as the SDK expects a base URL
+        let endpoint = this.config.baseUrl || process.env['AZURE_API_BASE'] || process.env['AZURE_OPENAI_ENDPOINT'] || '';
+        if (endpoint.endsWith('/')) endpoint = endpoint.slice(0, -1);
+
+        const apiVersion = this.config.apiVersion || process.env['AZURE_API_VERSION'] || process.env['AZURE_OPENAI_API_VERSION'] || '2024-02-15-preview';
+        const deploymentName = this.config.deploymentName || process.env['AZURE_DEPLOYMENT_NAME'] || this.config.model;
 
         const client = new AzureOpenAI({
             apiKey,
@@ -112,8 +115,8 @@ export class AzureOpenAIProvider implements LLMProvider {
     }
 
     async isAvailable(): Promise<boolean> {
-        const key = this.config.apiKey ?? process.env['AZURE_API_KEY'];
-        const base = this.config.baseUrl ?? process.env['AZURE_API_BASE'];
+        const key = this.config.apiKey || process.env['AZURE_API_KEY'] || process.env['AZURE_OPENAI_API_KEY'];
+        const base = this.config.baseUrl || process.env['AZURE_API_BASE'] || process.env['AZURE_OPENAI_ENDPOINT'];
         return !!(key && base);
     }
 }
