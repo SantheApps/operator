@@ -66,15 +66,12 @@ The LLM reads the errors ("not a git repository") and decides to add a check:
 ### 3. Apply & Reload
 The agent overwrites `prompt.md` with the new version and reloads the skill instantly. The next execution uses the fixed logic.
 
-## 🚀 Conclusion
+## 🚀 But Wait, There's More
 
-We have built a system that:
-1.  **Decomposes** vague goals into tasks.
-2.  **Executes** tasks using defined skills.
-3.  **Remembers** context and learnings.
-4.  **Monitors** itself and **Fixes** its own tools.
+In **v0.8.0**, we took everything further. The agent is now extensible and conversational.
 
-This loop—Plan, Do, Check, Act—is the foundation of autonomy.
+In **Part 6**, we'll cover the **Plugin Ecosystem**—hooks that intercept execution, lightweight commands, and multi-CLI orchestration.
+In **Part 7**, we'll build the **Interactive CLI**—a Claude Code-style conversational experience.
 
 ### 📚 Series Recap
 
@@ -83,6 +80,8 @@ This loop—Plan, Do, Check, Act—is the foundation of autonomy.
 - **Part 3**: The Body (Skill Execution)
 - **Part 4**: The Memory (Persistence)
 - **Part 5**: Self-Improvement (Auto-Fixer)
+- **Part 6**: Plugin Ecosystem (Hooks, Commands, Multi-CLI)
+- **Part 7**: Interactive CLI
 
 You can explore the full source code and contribute at [GitHub](https://github.com/praveencs87/agent).
 

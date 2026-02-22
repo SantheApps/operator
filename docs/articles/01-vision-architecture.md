@@ -7,8 +7,9 @@ This is the promise of **Autonomous Agents**. Unlike chatbots, agents have:
 2.  **Memory** (persistence across sessions)
 3.  **Skills** (integrations with real-world tools)
 4.  **Autonomy** (looping execution without constant prompts)
+5.  **Extensibility** (plugins, hooks, and commands to grow capabilities)
 
-In this 5-part series, we will break down exactly how we built `@praveencs/agent`, a powerful, open-source autonomous agent runtime.
+In this 7-part series, we will break down exactly how we built `@praveencs/agent`, a powerful, open-source autonomous agent runtime.
 
 ## 🏗️ The Core Architecture
 
@@ -33,6 +34,16 @@ A developer who forgets the codebase every morning is useless. Our agent needs *
 The secret sauce is the loop. A chatbot waits for input. An agent runs in a loop.
 - **Role**: A background process that constantly checks for pending tasks, file changes, or new goals.
 
+### 5. The Nervous System (Hooks & Plugins)
+As of **v0.8.0**, our agent has a full extensibility layer:
+- **Lifecycle Hooks**: Intercept execution at any point (`before:tool`, `after:plan`, etc.).
+- **Lightweight Commands**: Markdown-based goal templates—no code needed.
+- **Plugin System**: Install community bundles that add skills, commands, and hooks.
+- **Multi-CLI Tools**: Delegate tasks to Cursor, Codex, Gemini, or Claude CLIs.
+
+### 6. The Voice (Interactive CLI)
+The agent now has a **conversational interface**. Type `agent` with no arguments to enter an interactive REPL with slash commands, tab completion, and multi-turn context.
+
 ## 🛠️ Tech Stack
 
 We're building this in **TypeScript** (Node.js) because:
@@ -48,5 +59,14 @@ We're building this in **TypeScript** (Node.js) because:
 ## 🚀 What's Next?
 
 In **Part 2**, we will dive into the code for **The Brain**. We'll write the `GoalDecomposer` class that turns vague requests into structured project plans.
+
+### 📚 Full Series
+1. **Architecture & Vision** (This Article)
+2. **The Brain (Goal Decomposition)**
+3. **The Body (Skill Execution)**
+4. **The Memory (Persistence)**
+5. **Self-Improvement (Auto-Fixer)**
+6. **Plugin Ecosystem (Hooks, Commands, Multi-CLI)**
+7. **Interactive CLI**
 
 Stay tuned!
