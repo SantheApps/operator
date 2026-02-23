@@ -37,6 +37,10 @@ export interface TenantResolution {
     tenantContextPrompt?: string;
 }
 
+export interface TenantResolutionOptions {
+    strictTenantContext?: boolean;
+}
+
 export async function loadTenantRuntimeContext(cwd: string): Promise<TenantRuntimeContext> {
     const indexPath = path.join(cwd, '.agent', 'context', 'tenant-index.json');
     try {
@@ -54,8 +58,19 @@ export async function loadTenantRuntimeContext(cwd: string): Promise<TenantRunti
 export async function resolveTenantForInput(
     cwd: string,
     userInput: string,
-    runtime: TenantRuntimeContext
+    runtime: TenantRuntimeContext,
+    options?: TenantResolutionOptions
 ): Promise<TenantResolution> {
+    const strict = options?.strictTenantContext ?? false;
+
+    if (!runtime.enforce && strict) {
+        return {
+            resolved: false,
+            blocked: true,
+            reason: 'tenant_context_not_ready',
+        };
+    }
+
     if (!runtime.enforce) {
         return { resolved: false, blocked: false, reason: 'tenant_guard_not_enforced' };
     }
@@ -154,8 +169,8 @@ async function buildTenantPrompt(cwd: string, entry: TenantIndexEntry): Promise<
 
 export function tenantResolutionMessage(): string {
     return [
-        'Tenant context is required before continuing.',
-        'Provide `organizationId` (preferred) or `instanceId` in your request,',
+        'Tenant business context is required before continuing.',
+        'Generate tenant packs first (operator-tenant-context-refresh), then provide `organizationId` (preferred) or `instanceId`,',
         'or set env vars `OPERATOR_ORGANIZATION_ID` / `OPERATOR_INSTANCE_ID`.',
     ].join(' ');
 }

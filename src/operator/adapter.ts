@@ -87,7 +87,9 @@ export async function runOperator(request: RunOperatorRequest): Promise<RunOpera
 
     const tenantRuntime = await loadTenantRuntimeContext(cwd);
     const resolverInput = `organizationId:${request.organizationId}${request.instanceId ? ` instanceId:${request.instanceId}` : ''}`;
-    const tenantResolution = await resolveTenantForInput(cwd, resolverInput, tenantRuntime);
+    const tenantResolution = await resolveTenantForInput(cwd, resolverInput, tenantRuntime, {
+        strictTenantContext: true,
+    });
     if (tenantResolution.blocked) {
         return {
             success: false,
