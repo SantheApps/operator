@@ -13,6 +13,7 @@ export { ConfigLoader } from './config/loader.js';
 export { HookRegistry } from './hooks/registry.js';
 export { CommandLoader } from './commands/loader.js';
 export { PluginLoader } from './plugins/loader.js';
+export { runOperator } from './operator/adapter.js';
 
 // Types
 export type { ToolDefinition, ToolResult } from './tools/types.js';
@@ -23,3 +24,4 @@ export type { ExecutionContext, StepResult } from './engine/types.js';
 export type { HookEvent, HookDefinition, HookContext } from './hooks/types.js';
 export type { CommandDefinition } from './commands/types.js';
 export type { PluginManifest, LoadedPlugin } from './plugins/types.js';
+export type { RunOperatorRequest, RunOperatorResponse } from './operator/adapter.js';
