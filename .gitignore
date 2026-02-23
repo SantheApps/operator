@@ -25,3 +25,6 @@ Thumbs.db
 
 # Skill Hub (separate repo)
 /agent-skills
+
+# Agent Runtime
+agent.config.json
