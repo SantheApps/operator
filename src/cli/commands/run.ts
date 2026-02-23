@@ -14,6 +14,11 @@ import { generateRunId } from '../../utils/paths.js';
 import { zodToJsonSchema } from '../../utils/schema.js';
 import type { ExecutionContext } from '../../tools/types.js';
 import type { LLMMessage } from '../../llm/types.js';
+import {
+    loadTenantRuntimeContext,
+    resolveTenantForInput,
+    tenantResolutionMessage,
+} from '../../tenant/context.js';
 
 export function createRunCommand(): Command {
     const cmd = new Command('run')
@@ -34,6 +39,7 @@ export function createRunCommand(): Command {
             const llmRouter = new LLMRouter(config);
             const skillRunner = new SkillRunner(registry, policy, llmRouter);
             const commandLoader = new CommandLoader();
+            const tenantRuntime = await loadTenantRuntimeContext(process.cwd());
 
 
             await skillLoader.loadAll();
@@ -57,6 +63,12 @@ export function createRunCommand(): Command {
                 onApproval: promptApproval,
                 onProgress: (msg) => progress.info(msg),
             };
+
+            const tenantResolution = await resolveTenantForInput(process.cwd(), goal, tenantRuntime);
+            if (tenantResolution.blocked) {
+                console.error(chalk.red(tenantResolutionMessage()));
+                process.exit(1);
+            }
 
             if (options.skill) {
                 // Run a specific skill
@@ -115,6 +127,9 @@ export function createRunCommand(): Command {
 
                     const messages: LLMMessage[] = [
                         { role: 'system', content: command.prompt },
+                        ...(tenantResolution.tenantContextPrompt
+                            ? [{ role: 'system' as const, content: tenantResolution.tenantContextPrompt }]
+                            : []),
                         { role: 'user', content: `Execute this command. Additional context: ${goal}` },
                     ];
 
@@ -191,7 +206,8 @@ INSTRUCTIONS:
 1. Use available tools to complete the user's goal step by step.
 2. If the user asks for a task covered by a skill (like opening VS Code), you can execute the underlying tool (e.g. cmd.run) to achieve it.
 3. Be proactive: if the user wants an action (open app, create file), DO IT. Do not just explain how.
-4. When done, provide a final summary.`,
+4. When done, provide a final summary.
+${tenantResolution.tenantContextPrompt ? `\n\n${tenantResolution.tenantContextPrompt}` : ''}`,
                         },
                         { role: 'user', content: goal },
                     ];

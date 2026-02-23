@@ -16,6 +16,12 @@ import { SlashCommandRegistry } from './slash-commands.js';
 import { zodToJsonSchema } from '../utils/schema.js';
 import { generateRunId } from '../utils/paths.js';
 import type { ExecutionContext } from '../tools/types.js';
+import {
+    loadTenantRuntimeContext,
+    resolveTenantForInput,
+    tenantResolutionMessage,
+    type TenantRuntimeContext,
+} from '../tenant/context.js';
 
 /**
  * Interactive REPL — the heart of the Claude Code-style experience
@@ -97,6 +103,7 @@ INSTRUCTIONS:
     const slashCommands = new SlashCommandRegistry();
     const slashCtx = { config, skillLoader, commandLoader, hookRegistry, llmRouter };
     const spinner = new Spinner();
+    const tenantRuntime = await loadTenantRuntimeContext(process.cwd());
 
     const ctx: ExecutionContext = {
         runId: generateRunId(),
@@ -158,7 +165,7 @@ INSTRUCTIONS:
                     const command = commandLoader.get(cmdName)!;
                     console.log(chalk.dim(`\n  Running command: ${command.name}...`));
                     await executeGoal(command.prompt, `Execute: ${cmdArgs || command.description}`, command.tools, {
-                        conversation, llmRouter, registry, policy, toolDefs, ctx, spinner, rl,
+                        conversation, llmRouter, registry, policy, toolDefs, ctx, spinner, rl, tenantRuntime,
                     });
                     return;
                 }
@@ -177,7 +184,7 @@ INSTRUCTIONS:
             // ─── Natural language goal ───
             console.log();
             await executeGoal(undefined, trimmed, [], {
-                conversation, llmRouter, registry, policy, toolDefs, ctx, spinner, rl,
+                conversation, llmRouter, registry, policy, toolDefs, ctx, spinner, rl, tenantRuntime,
             });
         } catch (err) {
             renderError((err as Error).message);
@@ -202,6 +209,7 @@ interface ExecDeps {
     ctx: ExecutionContext;
     spinner: Spinner;
     rl: ReturnType<typeof createInterface>;
+    tenantRuntime: TenantRuntimeContext;
 }
 
 async function executeGoal(
@@ -210,7 +218,7 @@ async function executeGoal(
     scopedTools: string[],
     deps: ExecDeps
 ): Promise<void> {
-    const { conversation, llmRouter, registry, policy, ctx, spinner, rl } = deps;
+    const { conversation, llmRouter, registry, policy, ctx, spinner, rl, tenantRuntime } = deps;
     const start = Date.now();
 
     // Scope tools if command specifies them
@@ -225,11 +233,21 @@ async function executeGoal(
         );
     }
 
+    const tenantResolution = await resolveTenantForInput(process.cwd(), userMessage, tenantRuntime);
+    if (tenantResolution.blocked) {
+        console.log(chalk.yellow(`  ${tenantResolutionMessage()}`));
+        rl.prompt();
+        return;
+    }
+
     // Add user message to conversation
     conversation.addUser(userMessage);
-    const messages = systemOverride
+    const baseMessages = systemOverride
         ? [{ role: 'system' as const, content: systemOverride }, ...conversation.getMessages().slice(1)]
         : conversation.getMessages();
+    const messages = tenantResolution.tenantContextPrompt
+        ? [baseMessages[0], { role: 'system' as const, content: tenantResolution.tenantContextPrompt }, ...baseMessages.slice(1)]
+        : baseMessages;
 
     spinner.start('Thinking...');
 
